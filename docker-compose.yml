@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cicd-postgres
+    environment:
+      POSTGRES_USER: cicd_user
+      POSTGRES_PASSWORD: cicd_password
+      POSTGRES_DB: cicd_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cicd-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cicd-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cicd-network
+
+  minio:
+    image: minio/minio
+    container_name: cicd-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - cicd-network
+
+networks:
+  cicd-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
