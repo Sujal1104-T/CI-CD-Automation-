@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { buildQueue } from '../queue/buildQueue';
-// import prisma from '../config/db'; // Disabled
-import { MOCK_BUILDS, MOCK_PIPELINES } from '../routes/builds';
+import { query } from '../config/database';
 
 const router = Router();
 
@@ -14,40 +13,49 @@ router.post('/', async (req, res) => {
         const branch = payload.ref.replace('refs/heads/', '');
         const commitIds = payload.commits.map((c: any) => c.id);
 
-        console.log(`Received push for ${repoUrl} on branch ${branch}`);
+        console.log(`[Webhook] Received push for ${repoUrl} on branch ${branch}`);
 
-        // Find pipeline (mock)
-        const pipeline = MOCK_PIPELINES.find(p => p.repoUrl === repoUrl);
+        try {
+            // Find pipeline by repo URL
+            const pipelineResult = await query(
+                `SELECT id, repo_url FROM pipelines WHERE repo_url = $1 LIMIT 1`,
+                [repoUrl]
+            );
 
-        if (pipeline) {
-            const build = {
-                id: 'b' + Date.now(),
-                pipelineId: pipeline.id,
-                status: 'pending',
-                trigger: 'webhook',
-                createdAt: new Date(),
-                startTime: null,
-                endTime: null,
-                jobs: []
-            };
-            MOCK_BUILDS.push(build);
+            if (pipelineResult.rows.length === 0) {
+                console.log(`[Webhook] No pipeline found for repo: ${repoUrl}`);
+                return res.json({ message: 'Ignored - No pipeline configured for this repository' });
+            }
 
+            const pipeline = pipelineResult.rows[0];
+
+            // Create build record
+            const buildResult = await query(
+                `INSERT INTO builds (pipeline_id, status, trigger) 
+                 VALUES ($1, $2, $3) 
+                 RETURNING id`,
+                [pipeline.id, 'pending', 'webhook']
+            );
+
+            const buildId = buildResult.rows[0].id;
+
+            // Add to queue
             await buildQueue.add('build-job', {
                 repoUrl,
                 branch,
                 commit: payload.after,
-                triggeredBy: 'webhook'
+                triggeredBy: 'webhook',
+                buildId
             });
-            res.json({ message: 'Build triggered', buildId: build.id });
-        } else {
-            // console.log("No pipeline found for repo");
-            // ensure we return valid json handling
-            res.json({ message: 'Ignored - No pipeline' });
+
+            res.json({ message: 'Build triggered', buildId });
+        } catch (error) {
+            console.error('[Webhook] Error processing webhook:', error);
+            res.status(500).json({ error: 'Failed to process webhook' });
         }
     } else {
-        res.json({ message: 'Ignored' });
+        res.json({ message: 'Ignored - Not a push event' });
     }
 });
-
 
 export default router;
