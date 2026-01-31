@@ -26,11 +26,8 @@ pool.on('error', (err) => {
 
 // Helper function to execute queries
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
-    const start = Date.now();
     try {
         const res = await pool.query<T>(text, params);
-        const duration = Date.now() - start;
-        console.log('[Database] Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
         return res;
     } catch (error) {
         console.error('[Database] Query error', { text, error });

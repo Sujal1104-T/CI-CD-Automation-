@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import githubRoutes from './webhooks/github';
 import buildRoutes from './routes/builds';
+import pipelinesRoutes from './routes/pipelines';
 import logsRoutes from './routes/logs';
 import { initWorker, setWebSocketServer } from './queue/buildQueue';
 import { initWebSocket } from './logs/websocket';
@@ -18,6 +19,7 @@ app.use(express.json());
 
 app.use('/webhooks/github', githubRoutes);
 app.use('/builds', buildRoutes);
+app.use('/pipelines', pipelinesRoutes);
 app.use('/logs', logsRoutes);
 
 app.get('/', (req, res) => {
